@@ -48,8 +48,9 @@ class DataFrame_API(CCommonStockApi):
         # 遍历字典列表
         for index, row_dict in enumerate(dict_list):
             time_str = row_dict['date'].strftime('%Y-%m-%d %H:%M:%S')
+            print(time_str)
             row_dict[DATA_FIELD.FIELD_TIME] = parse_time_column(time_str)
-            print(f"第 {index} 行的数据：{row_dict}")
+            print(f"第 {index} 行的数据：{row_dict}, 时间:{dict_list}")
             yield CKLine_Unit(row_dict)
 
     def SetBasciInfo(self):

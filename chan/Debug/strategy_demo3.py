@@ -1,11 +1,11 @@
 import copy
 from typing import List
 
-from Chan import CChan
-from ChanConfig import CChanConfig
-from Common.CEnum import AUTYPE, DATA_FIELD, DATA_SRC, KL_TYPE
-from DataAPI.BaoStockAPI import CBaoStock
-from KLine.KLine_Unit import CKLine_Unit
+from chan.Chan import CChan
+from chan.ChanConfig import CChanConfig
+from chan.Common.CEnum import AUTYPE, DATA_FIELD, DATA_SRC, KL_TYPE
+from chan.DataAPI.BaoStockAPI import CBaoStock
+from chan.KLine.KLine_Unit import CKLine_Unit
 
 
 def combine_60m_klu_form_15m(klu_15m_lst: List[CKLine_Unit]) -> CKLine_Unit:

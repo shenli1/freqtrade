@@ -209,7 +209,7 @@ def test_FtCoinGeckoApi():
     assert ftc.extra_params is None
     assert ftc.api_base_url == "https://api.coingecko.com/api/v3/"
 
-    # defaults to demo
+    # defaults to debug
     ftc = FtCoinGeckoApi(api_key="123456")
     assert ftc.extra_params is not None
     assert ftc.extra_params["x_cg_demo_api_key"] == "123456"

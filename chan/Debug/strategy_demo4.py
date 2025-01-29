@@ -1,7 +1,7 @@
-from Chan import CChan
-from ChanConfig import CChanConfig
-from Common.CEnum import AUTYPE, DATA_SRC, KL_TYPE
-from DataAPI.BaoStockAPI import CBaoStock
+from chan.Chan import CChan
+from chan.ChanConfig import CChanConfig
+from chan.Common.CEnum import AUTYPE, DATA_SRC, KL_TYPE
+from chan.DataAPI.BaoStockAPI import CBaoStock
 
 if __name__ == "__main__":
     """

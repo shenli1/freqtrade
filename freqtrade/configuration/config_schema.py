@@ -403,7 +403,7 @@ CONF_SCHEMA = {
             "type": "object",
             "properties": {
                 "is_demo": {
-                    "description": "Whether to use CoinGecko in demo mode.",
+                    "description": "Whether to use CoinGecko in debug mode.",
                     "type": "boolean",
                     "default": True,
                 },
