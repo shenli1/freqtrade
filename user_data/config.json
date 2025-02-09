@@ -51,7 +51,7 @@
     "max_open_trades": 5,
     "api_server": {
         "enabled": true,
-        "listen_ip_address": "127.0.0.1",
+        "listen_ip_address": "0.0.0.0",
         "listen_port": 8080,
         "verbosity": "error",
         "enable_openapi": false,
@@ -61,5 +61,5 @@
         "username": "freqtrader",
         "password": "freqtrader"
     },
-  "bot_name": "freqtrade"
+  "bot_name": "freqtrader"
 }
