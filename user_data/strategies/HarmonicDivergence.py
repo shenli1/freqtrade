@@ -606,12 +606,15 @@ def divergence_finder_dataframe(dataframe: DataFrame, indicator_source: str) -> 
                 bearish_lines_index = bearish_lines_index + 1
             if can_exist:
                 bearish_divergences[index] = row.close
-                dataframe["total_bearish_divergences"][index] = row.close
+                dataframe.loc[index, "total_bearish_divergences"] = row.close
                 if index > 30:
-                    dataframe["total_bearish_divergences_count"][index - 30] = \
-                    dataframe["total_bearish_divergences_count"][index - 30] + 1
-                    dataframe["total_bearish_divergences_names"][index - 30] = \
-                    dataframe["total_bearish_divergences_names"][index - 30] + indicator_source.upper() + '<br>'
+                    dataframe.loc[index - 30, "total_bearish_divergences_count"] = (
+                            dataframe.loc[index - 30, "total_bearish_divergences_count"] + 1
+                    )
+                    dataframe.loc[index - 30, "total_bearish_divergences_names"] = (
+                            dataframe.loc[index - 30, "total_bearish_divergences_names"]
+                            + indicator_source.upper() + '<br>'
+                    )
 
         bullish_occurence = bullish_divergence_finder(dataframe,
                                                       dataframe[indicator_source],
@@ -652,12 +655,15 @@ def divergence_finder_dataframe(dataframe: DataFrame, indicator_source: str) -> 
                 bullish_lines_index = bullish_lines_index + 1
             if can_exist:
                 bullish_divergences[index] = row.close
-                dataframe["total_bullish_divergences"][index] = row.close
+                dataframe.loc[index, "total_bullish_divergences"] = row.close
                 if index > 30:
-                    dataframe["total_bullish_divergences_count"][index - 30] = \
-                    dataframe["total_bullish_divergences_count"][index - 30] + 1
-                    dataframe["total_bullish_divergences_names"][index - 30] = \
-                    dataframe["total_bullish_divergences_names"][index - 30] + indicator_source.upper() + '<br>'
+                    dataframe.loc[index - 30, "total_bullish_divergences_count"] = (
+                            dataframe.loc[index - 30, "total_bullish_divergences_count"] + 1
+                    )
+                    dataframe.loc[index - 30, "total_bullish_divergences_names"] = (
+                            dataframe.loc[index - 30, "total_bullish_divergences_names"]
+                            + indicator_source.upper() + '<br>'
+                    )
 
     return (bearish_divergences, bearish_lines, bullish_divergences, bullish_lines)
 
