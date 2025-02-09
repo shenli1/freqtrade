@@ -32,7 +32,7 @@ def parse_time_column(inp):
         minute = int(inp[14:16])
     else:
         raise Exception(f"unknown time column from csv:{inp}")
-    return CTime(year, month, day, hour, minute)
+    return CTime(year, month, day, hour, minute,auto=False)
 
 class DataFrame_API(CCommonStockApi):
     def __init__(self, code, k_type=KL_TYPE.K_DAY, begin_date=None, end_date=None, autype=None):
@@ -48,9 +48,7 @@ class DataFrame_API(CCommonStockApi):
         # 遍历字典列表
         for index, row_dict in enumerate(dict_list):
             time_str = row_dict['date'].strftime('%Y-%m-%d %H:%M:%S')
-            print(time_str)
             row_dict[DATA_FIELD.FIELD_TIME] = parse_time_column(time_str)
-            print(f"第 {index} 行的数据：{row_dict}, 时间:{dict_list}")
             yield CKLine_Unit(row_dict)
 
     def SetBasciInfo(self):

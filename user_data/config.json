@@ -1,0 +1,65 @@
+{
+    "pairlists": [
+      {
+        "method": "StaticPairList"
+      }
+    ],
+    "timeframe": "15m",
+    "tradable_balance_ratio": 0.99,
+    "fiat_display_currency": "USD",
+    "stake_amount": "unlimited",
+    "stake_currency": "USDT",
+    "amend_last_stake_amount": true,
+    "entry_pricing": {
+        "price_side": "other",
+        "use_order_book": true,
+        "order_book_top": 1,
+        "price_last_balance": 0.0,
+        "check_depth_of_market": {
+            "enabled": false,
+            "bids_to_ask_delta": 1
+        }
+    },
+    "exit_pricing":{
+        "price_side": "other",
+        "use_order_book": true,
+        "order_book_top": 1
+    },
+    "exchange": {
+      "ccxt_config": {
+            "httpsProxy": "http://127.0.0.1:8001",
+            "wsProxy": "http://127.0.0.1:8001"
+        },
+      "pair_whitelist": [
+        "BTC/USDT",
+        "BCH/USDT",
+        "ETH/USDT",
+        "LINK/USDT",
+        "LTC/USDT",
+        "SOL/USDT",
+        "BNB/USDT",
+        "XRP/USDT",
+        "ADA/USDT",
+        "DOT/USDT",
+        "ETC/USDT",
+        "ALGO/USDT",
+        "LUNA/USDT"
+      ],
+      "name": "binance"
+    },
+    "dry_run_wallet": 100,
+    "max_open_trades": 5,
+    "api_server": {
+        "enabled": true,
+        "listen_ip_address": "127.0.0.1",
+        "listen_port": 8080,
+        "verbosity": "error",
+        "enable_openapi": false,
+        "jwt_secret_key": "c95803e9b0a1d1532f6ce03b1962212e49c5cd02451cbbbdab47419014db349c",
+        "ws_token": "zhv7IZHeESj0UsnLL5RwJMXlqP5sToEHQA",
+        "CORS_origins": [],
+        "username": "freqtrader",
+        "password": "freqtrader"
+    },
+  "bot_name": "freqtrade"
+}
