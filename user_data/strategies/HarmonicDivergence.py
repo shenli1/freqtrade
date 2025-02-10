@@ -410,7 +410,6 @@ class HarmonicDivergence(IStrategy):
 
         return dataframe
 
-    @log_time
     def populate_buy_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         """
         Based on TA indicators, populates the buy signal for the given dataframe
@@ -455,7 +454,6 @@ class HarmonicDivergence(IStrategy):
             'sell'] = 0
         return dataframe
 
-    @log_time
     def custom_sell(self, pair: str, trade: 'Trade', current_time: 'datetime', current_rate: float,
                     current_profit: float, **kwargs):
 
