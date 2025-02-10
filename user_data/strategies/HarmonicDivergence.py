@@ -255,7 +255,7 @@ class HarmonicDivergence(IStrategy):
     timeframe = '15m'
 
     # Run "populate_indicators()" only for new candle.
-    process_only_new_candles = True
+    process_only_new_candles = False
 
     # These values can be overridden in the "ask_strategy" section in the config.
     use_sell_signal = True

@@ -34,12 +34,12 @@
         "order_book_top": 1
     },
         "exchange": {
-          /*
       "ccxt_config": {
-            "httpsProxy": "http://127.0.0.1:8001",
-            "wsProxy": "http://127.0.0.1:8001"
-        },
-        */
+            "enableRateLimit": true
+      }, "ccxt_async_config": {
+        "enableRateLimit": true,
+        "rateLimit": 3100
+    },
       "pair_whitelist": [
         "BTC/USDT",
         "BCH/USDT",
@@ -63,7 +63,7 @@
       }
     ],
     "telegram": {
-        "enabled": true,
+        "enabled": false,
         "token": "7758413942:AAE2jiZcgcClEhouRFBUaeRseMdmSV216Go",
         "chat_id": "5411409758"
     },
@@ -83,6 +83,6 @@
     "initial_state": "running",
     "force_entry_enable": false,
     "internals": {
-        "process_throttle_secs": 5
+        "process_throttle_secs": 60
     }
 }
