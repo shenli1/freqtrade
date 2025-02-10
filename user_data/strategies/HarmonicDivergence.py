@@ -19,6 +19,32 @@ import talib.abstract as ta
 import freqtrade.vendor.qtpylib.indicators as qtpylib
 from collections import deque
 
+import time
+import datetime
+from functools import wraps
+
+def log_time(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        # 记录开始时间
+        start_time = time.time()
+        start_dt = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f"函数 {func.__name__} 开始时间：{start_dt}")
+
+        # 执行函数体
+        result = func(*args, **kwargs)
+
+        # 记录结束时间
+        end_time = time.time()
+        end_dt = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f"函数 {func.__name__} 结束时间：{end_dt}")
+
+        # 计算总共耗时
+        elapsed = end_time - start_time
+        print(f"函数 {func.__name__} 总共耗时：{elapsed:.4f}秒")
+        return result
+
+    return wrapper
 
 class PlotConfig():
 
@@ -229,7 +255,7 @@ class HarmonicDivergence(IStrategy):
     timeframe = '15m'
 
     # Run "populate_indicators()" only for new candle.
-    process_only_new_candles = False
+    process_only_new_candles = True
 
     # These values can be overridden in the "ask_strategy" section in the config.
     use_sell_signal = True
@@ -258,7 +284,9 @@ class HarmonicDivergence(IStrategy):
     def get_ticker_indicator(self):
         return int(self.timeframe[:-1])
 
+    @log_time
     def populate_indicators(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
+
         """
         Adds several different TA indicators to the given DataFrame
 
@@ -276,6 +304,8 @@ class HarmonicDivergence(IStrategy):
         informative = dataframe
         # Momentum Indicators
         # ------------------------------------
+        print(dataframe.tail())
+        print(metadata)
 
         # RSI
         informative['rsi'] = ta.RSI(informative)
@@ -380,6 +410,7 @@ class HarmonicDivergence(IStrategy):
 
         return dataframe
 
+    @log_time
     def populate_buy_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         """
         Based on TA indicators, populates the buy signal for the given dataframe
@@ -408,6 +439,8 @@ class HarmonicDivergence(IStrategy):
 
         return dataframe
 
+
+
     def populate_sell_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         """
         Based on TA indicators, populates the sell signal for the given dataframe
@@ -422,6 +455,7 @@ class HarmonicDivergence(IStrategy):
             'sell'] = 0
         return dataframe
 
+    @log_time
     def custom_sell(self, pair: str, trade: 'Trade', current_time: 'datetime', current_rate: float,
                     current_profit: float, **kwargs):
 
@@ -435,9 +469,9 @@ class HarmonicDivergence(IStrategy):
                 takeprofit = buy_candle[resample('high')] + buy_candle[resample('atr')]
                 break
 
-        # if takeprofit < current_rate:
-        # self.trailing_stop = True
-        # return True
+        #if takeprofit < current_rate:
+        #    self.trailing_stop = True
+        #return True
 
     def custom_stoploss(self, pair: str, trade: 'Trade', current_time: datetime,
                         current_rate: float, current_profit: float, **kwargs) -> float:
