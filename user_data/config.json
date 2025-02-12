@@ -169,8 +169,8 @@
   },
   "telegram": {
     "enabled": true,
-    "token": "",
-    "chat_id": "",
+    "token": "7758413942:AAE2jiZcgcClEhouRFBUaeRseMdmSV216Go",
+    "chat_id": "5411409758",
     "keyboard": [
       [
         "/daily",
@@ -206,14 +206,16 @@
     "balance_dust_level": 0.01
   },
   "api_server": {
-    "enabled": false,
-    "listen_ip_address": "0.0.0.0",
-    "listen_port": 8080,
-    "verbosity": "info",
-    "jwt_secret_key": "somethingrandom",
-    "CORS_origins": [],
-    "username": "",
-    "password": ""
+        "enabled": true,
+        "listen_ip_address": "0.0.0.0",
+        "listen_port": 8080,
+        "verbosity": "info",
+        "enable_openapi": false,
+        "jwt_secret_key": "c95803e9b0a1d1532f6ce03b1962212e49c5cd02451cbbbdab47419014db349c",
+        "ws_token": "zhv7IZHeESj0UsnLL5RwJMXlqP5sToEHQA",
+        "CORS_origins": [],
+        "username": "freqtrader",
+        "password": "freqtrader"
   },
   "bot_name": "freqtrade",
   "initial_state": "running",
