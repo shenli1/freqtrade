@@ -36,8 +36,6 @@
     "key": "",
     "secret": "",
     "ccxt_config": {
-      "httpsProxy": "http://127.0.0.1:8001",
-      "wsProxy": "http://127.0.0.1:8001",
       "enableRateLimit": true
     },
     "ccxt_async_config": {
