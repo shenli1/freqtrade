@@ -4,7 +4,7 @@
   "stake_amount": "unlimited",
   "tradable_balance_ratio": 0.99,
   "fiat_display_currency": "CNY",
-  "dry_run": true,
+  "dry_run": false,
   "dry_run_wallet": 60,
   "cancel_open_orders_on_exit": false,
   "use_exit_signal": true,
@@ -36,8 +36,6 @@
     "key": "",
     "secret": "",
     "ccxt_config": {
-      "httpsProxy": "http://127.0.0.1:8001",
-      "wsProxy": "http://127.0.0.1:8001",
       "enableRateLimit": true
     },
     "ccxt_async_config": {

@@ -123,7 +123,7 @@
         "enabled": true,
         "listen_ip_address": "0.0.0.0",
         "listen_port": 8080,
-        "verbosity": "info",
+        "verbosity": "error",
         "enable_openapi": false,
         "jwt_secret_key": "c95803e9b0a1d1532f6ce03b1962212e49c5cd02451cbbbdab47419014db349c",
         "ws_token": "zhv7IZHeESj0UsnLL5RwJMXlqP5sToEHQA",
