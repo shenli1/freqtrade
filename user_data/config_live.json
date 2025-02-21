@@ -5,7 +5,7 @@
   "tradable_balance_ratio": 0.99,
   "fiat_display_currency": "CNY",
   "dry_run": false,
-  "dry_run_wallet": 60,
+  "dry_run_wallet": 1000,
   "cancel_open_orders_on_exit": false,
   "use_exit_signal": true,
   "exit_profit_only": false,
@@ -40,28 +40,32 @@
     },
     "ccxt_async_config": {
       "enableRateLimit": true,
-      "rateLimit": 200
+      "rateLimit": 50
     },
     "pair_whitelist": [],
     "pair_blacklist": [
         "(BTCUSDT_.*|ETHUSDT_.*)",
-        "(GT|HT|BTC|ETH|BNB|VITE|DGB|NMR|ZIL|QKC|REI)/.*",
+        "(GT|HT|BTC|ETH|BNB|LTC|MOB|PNT|DERP|GAL|DOCK|POLS|BAND|MDX|FLM|ARDR|ORN|JST|HMSTR|BEL|XTZ|REN|GFT|IRIS|OAX|KEY|EOS|DAR|XVG|SAND|IDEX|SCR|PIVX|AIXBT)/.*",
         "(WBTC|BSV|BTCDOM|DEFI)/.*",
-        ".*(_PREMIUM|BEAR|BULL|HALF|HEDGE|DOWN|UP|[1235][SL])/.*",
         "(AUD|BRZ|CAD|CHF|EUR|GBP|HKD|IDRT|JPY|NGN|RUB|SGD|TRY|UAH|USD|ZAR|UST)/.*",
-        "(BUSD|CUSDT|DAI|PAX|PAXG|SUSD|TUSD|USDC|USDT|VAI|USDN)/.*"
+        "(BUSD|CUSDT|DAI|PAX|PAXG|SUSD|TUSD|USDC|USDT|VAI|USDN|USDP|FDUSD|EURI)/.*"
         ]
   },
   "pairlists": [
         {
-            "method": "VolumePairList",
-            "number_assets": 90,
-            "sort_key": "quoteVolume",
-            "refresh_period": 3600
+        "method": "VolumePairList",
+        "number_assets": 110,
+        "sort_key": "quoteVolume"
         },
-        {
-            "method": "ShuffleFilter"
-        }
+    {
+       "method": "PercentChangePairList",
+       "number_assets": 110,
+        "min_value": -15,
+        "max_value": 150
+     },
+    {"method":"AgeFilter","min_days_listed":1},
+    {"method": "ShuffleFilter", "seed": 42},
+    {"method": "FullTradesFilter"}
     ],
   "edge": {
     "enabled": false,
@@ -94,7 +98,6 @@
         "/whitelist"
       ],
       [
-        "/reload_config",
         "/count",
         "/logs"
       ]

@@ -5,7 +5,7 @@
   "tradable_balance_ratio": 0.99,
   "fiat_display_currency": "CNY",
   "dry_run": true,
-  "dry_run_wallet": 60,
+  "dry_run_wallet": 1000,
   "cancel_open_orders_on_exit": false,
   "use_exit_signal": true,
   "exit_profit_only": false,
@@ -40,33 +40,33 @@
     },
     "ccxt_async_config": {
       "enableRateLimit": true,
-      "rateLimit": 200
+      "rateLimit": 50
     },
-    "pair_whitelist": ["BTC/USDT","ETH/USDT","USDC/USDT","LAYER/USDT","SOL/USDT","XRP/USDT","FDUSD/USDT","BNB/USDT","SUI/USDT","ADA/USDT","TST/USDT","PEPE/USDT","DOGE/USDT","LTC/USDT","BNX/USDT","TRUMP/USDT","TRX/USDT","WIF/USDT","OM/USDT","ENA/USDT","TAO/USDT","CAKE/USDT","PNUT/USDT","LINK/USDT","HBAR/USDT","NEAR/USDT","BERA/USDT","APT/USDT","JUP/USDT","AIXBT/USDT","1000CHEEMS/USDT","WLD/USDT","AVAX/USDT","RUNE/USDT","UNI/USDT","DOT/USDT","CRV/USDT","SHIB/USDT","IDEX/USDT","RAY/USDT","AAVE/USDT","XLM/USDT","ARKM/USDT","S/USDT","QTUM/USDT","FLOKI/USDT","RPL/USDT","ME/USDT","ARB/USDT","USTC/USDT","LDO/USDT","PENDLE/USDT","FET/USDT","BONK/USDT","ZEN/USDT","NEIRO/USDT","EIGEN/USDT","FIL/USDT","GALA/USDT","LISTA/USDT","EUR/USDT","ALGO/USDT","ETHFI/USDT","ORDI/USDT","PENGU/USDT","OP/USDT","TIA/USDT","USUAL/USDT","SEI/USDT","BANANA/USDT","COOKIE/USDT","THE/USDT","INJ/USDT","AI/USDT","GMT/USDT","ETC/USDT","WBTC/USDT","VET/USDT","RENDER/USDT","SYN/USDT","ACH/USDT","ACT/USDT","MEME/USDT","BOME/USDT","ATOM/USDT","SOLV/USDT","TON/USDT","SAND/USDT","HIVE/USDT","SCR/USDT","KAVA/USDT","ICP/USDT","IO/USDT","ENS/USDT","D/USDT","JASMY/USDT","AR/USDT","LUMIA/USDT","LUNC/USDT","MOVE/USDT"]
+    "pair_whitelist": [],
+    "pair_blacklist": [
+        "(BTCUSDT_.*|ETHUSDT_.*)",
+        "(GT|HT|BTC|ETH|BNB|LTC|MOB|PNT|DERP|GAL|DOCK|POLS|BAND|MDX|FLM|ARDR|ORN|JST|HMSTR|BEL|XTZ|REN|GFT|IRIS|OAX|KEY|EOS|DAR|XVG|SAND|IDEX|SCR|PIVX|AIXBT)/.*",
+        "(WBTC|BSV|BTCDOM|DEFI)/.*",
+        "(AUD|BRZ|CAD|CHF|EUR|GBP|HKD|IDRT|JPY|NGN|RUB|SGD|TRY|UAH|USD|ZAR|UST)/.*",
+        "(BUSD|CUSDT|DAI|PAX|PAXG|SUSD|TUSD|USDC|USDT|VAI|USDN|USDP|FDUSD|EURI)/.*"
+        ]
   },
   "pairlists": [
+        {
+        "method": "VolumePairList",
+        "number_assets": 110,
+        "sort_key": "quoteVolume"
+        },
     {
-      "method": "StaticPairList"
-    },
-//        {"method": "AgeFilter", "min_days_listed": 7},
-//        {
-//                "method": "VolatilityFilter",
-//                "lookback_days": 3,
-//                "min_volatility": 0.02,
-//                "max_volatility": 0.75,
-//                "refresh_period": 3600
-//        },
-//        {
-//            "method": "RangeStabilityFilter",
-//            "lookback_days": 3,
-//            "min_rate_of_change": 0.05,
-//            "refresh_period": 3600
-//        },
-    {
-      "method": "ShuffleFilter",
-      "seed": 42
-    }
-  ],
+       "method": "PercentChangePairList",
+       "number_assets": 110,
+        "min_value": -15,
+        "max_value": 150
+     },
+    {"method":"AgeFilter","min_days_listed":1},
+    {"method": "ShuffleFilter", "seed": 42},
+    {"method": "FullTradesFilter"}
+    ],
   "edge": {
     "enabled": false,
     "process_throttle_secs": 3600,
@@ -98,7 +98,6 @@
         "/whitelist"
       ],
       [
-        "/reload_config",
         "/count",
         "/logs"
       ]
