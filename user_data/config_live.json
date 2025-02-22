@@ -42,30 +42,17 @@
       "enableRateLimit": true,
       "rateLimit": 50
     },
-    "pair_whitelist": [],
+    "pair_whitelist":
+      ["BTC/USDT","ETH/USDT","XRP/USDT","BNB/USDT","SOL/USDT","USDC/USDT","DOGE/USDT","ADA/USDT","TRX/USDT","WBTC/USDT","LINK/USDT","AVAX/USDT","SUI/USDT","XLM/USDT","LTC/USDT","SHIB/USDT","TON/USDT","HBAR/USDT","DOT/USDT","OM/USDT","BCH/USDT","UNI/USDT","NEAR/USDT","PEPE/USDT","AAVE/USDT","TAO/USDT","APT/USDT","ICP/USDT","TRUMP/USDT","ETC/USDT","S/USDT","VET/USDT","POL/USDT","ALGO/USDT","RENDER/USDT","FIL/USDT","ARB/USDT","JUP/USDT","ATOM/USDT","FET/USDT","TIA/USDT","FDUSD/USDT","OP/USDT","LDO/USDT","INJ/USDT","ENA/USDT","QNT/USDT","STX/USDT","THETA/USDT","BNSOL/USDT","NEXO/USDT","GRT/USDT","RAY/USDT","SEI/USDT","WLD/USDT","MKR/USDT","IMX/USDT","BONK/USDT","MOVE/USDT","DEXE/USDT","JASMY/USDT","GALA/USDT","EOS/USDT","XTZ/USDT"]
+,
     "pair_blacklist": [
-        "(BTCUSDT_.*|ETHUSDT_.*)",
-        "(GT|HT|BTC|ETH|BNB|LTC|MOB|PNT|DERP|GAL|DOCK|POLS|BAND|MDX|FLM|ARDR|ORN|JST|HMSTR|BEL|XTZ|REN|GFT|IRIS|OAX|KEY|EOS|DAR|XVG|SAND|IDEX|SCR|PIVX|AIXBT)/.*",
-        "(WBTC|BSV|BTCDOM|DEFI)/.*",
-        "(AUD|BRZ|CAD|CHF|EUR|GBP|HKD|IDRT|JPY|NGN|RUB|SGD|TRY|UAH|USD|ZAR|UST)/.*",
-        "(BUSD|CUSDT|DAI|PAX|PAXG|SUSD|TUSD|USDC|USDT|VAI|USDN|USDP|FDUSD|EURI)/.*"
         ]
   },
   "pairlists": [
-        {
-        "method": "VolumePairList",
-        "number_assets": 110,
-        "sort_key": "quoteVolume"
-        },
     {
-       "method": "PercentChangePairList",
-       "number_assets": 110,
-        "min_value": -15,
-        "max_value": 150
-     },
-    {"method":"AgeFilter","min_days_listed":1},
-    {"method": "ShuffleFilter", "seed": 42},
-    {"method": "FullTradesFilter"}
+      "method": "StaticPairList"
+    },
+    {"method": "ShuffleFilter"}
     ],
   "edge": {
     "enabled": false,
