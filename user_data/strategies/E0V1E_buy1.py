@@ -39,10 +39,10 @@ class E0V1E_BUY1(IStrategy):
     use_custom_stoploss = False
 
     is_optimize_32 = True
-    buy_rsi_fast_32 = IntParameter(20, 70, default=40, space='buy', optimize=is_optimize_32)
-    buy_rsi_32 = IntParameter(15, 50, default=42, space='buy', optimize=is_optimize_32)
-    buy_sma15_32 = DecimalParameter(0.900, 1, default=0.973, decimals=3, space='buy', optimize=is_optimize_32)
-    buy_cti_32 = DecimalParameter(-1, 1, default=0.69, decimals=2, space='buy', optimize=is_optimize_32)
+    buy_rsi_fast_32 = IntParameter(20, 70, default=40, space='buy', optimize=True)
+    buy_rsi_32 = IntParameter(15, 50, default=42, space='buy', optimize=True)
+    buy_sma15_32 = DecimalParameter(0.900, 1, default=0.973, decimals=3, space='buy', optimize=False)
+    buy_cti_32 = DecimalParameter(-1, 1, default=-0.69, decimals=2, space='buy', optimize=False)
 
     sell_fastx = IntParameter(50, 100, default=84, space='sell', optimize=True)
 
