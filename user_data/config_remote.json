@@ -36,15 +36,15 @@
     "key": "",
     "secret": "",
     "ccxt_config": {
-      "httpsProxy": "http://127.0.0.1:8001",
-      "wsProxy": "http://127.0.0.1:8001",
       "enableRateLimit": true
     },
     "ccxt_async_config": {
       "enableRateLimit": true,
-      "rateLimit": 200
+      "rateLimit": 250
     },
-    "pair_whitelist": ["SOL/USDT","MKR/USDT","TAO/USDT","LTC/USDT","YFI/USDT","AAVE/USDT","BCH/USDT","TRUMP/USDT","AVAX/USDT","XRP/USDT","LINK/USDT","GNO/USDT","BNSOL/USDT","OM/USDT","SUI/USDT","BERA/USDT","APT/USDT","TRB/USDT","INJ/USDT","ETC/USDT","ENS/USDT","ORDI/USDT","UNI/USDT","QNT/USDT","CAKE/USDT","AUCTION/USDT","DOT/USDT","VANA/USDT","METIS/USDT","S/USDT","RAY/USDT","NEAR/USDT","RUNE/USDT","ZEN/USDT","ZEC/USDT","TIA/USDT","AR/USDT","COMP/USDT","EGLD/USDT","BIFI/USDT","ADA/USDT","ICP/USDT","SSV/USDT","FIL/USDT","DASH/USDT","JTO/USDT","BNX/USDT","BANANA/USDT","TON/USDT","XVS/USDT","ATOM/USDT","EIGEN/USDT","LDO/USDT","RENDER/USDT","WLD/USDT","DOGE/USDT","PENDLE/USDT","WIF/USDT","KSM/USDT","DEXE/USDT","NEO/USDT","ILV/USDT","JUP/USDT","ENA/USDT","OP/USDT","GMX/USDT","MOVR/USDT","ETHFI/USDT","ZRO/USDT","LPT/USDT","AXS/USDT","NMR/USDT","FET/USDT","ARKM/USDT","QTUM/USDT","SEI/USDT","IO/USDT","FARM/USDT","RPL/USDT","FTT/USDT","ARB/USDT","HBAR/USDT","JUV/USDT","OMNI/USDT","LAYER/USDT","ME/USDT","PNUT/USDT","PROM/USDT","AGLD/USDT","CRV/USDT","BADGER/USDT","THE/USDT","ALCX/USDT","CREAM/USDT","OG/USDT","THETA/USDT","MLN/USDT","AIXBT/USDT","MOVE/USDT","XLM/USDT","STX/USDT","GLM/USDT","ARK/USDT","CVX/USDT","DYDX/USDT","SNX/USDT","APE/USDT","CYBER/USDT","EOS/USDT","SUSHI/USDT","DCR/USDT","MASK/USDT","RONIN/USDT","USUAL/USDT","GAS/USDT","POL/USDT","DEGO/USDT","SAND/USDT","BAR/USDT","HEI/USDT","ACT/USDT","FXS/USDT","UMA/USDT","ALGO/USDT","PYR/USDT","STORJ/USDT","SANTOS/USDT","IMX/USDT","BEL/USDT","API3/USDT","SAGA/USDT","MANTA/USDT","PYTH/USDT","TWT/USDT","ACE/USDT","BURGER/USDT","ACM/USDT","SCR/USDT","WING/USDT","AXL/USDT","LQTY/USDT","PHB/USDT","ORCA/USDT","FORTH/USDT","TNSR/USDT","HIGH/USDT","XTZ/USDT","SUPER/USDT","RLC/USDT","LISTA/USDT","LUMIA/USDT","ATM/USDT","ASR/USDT","BAKE/USDT","KDA/USDT","AVA/USDT","COOKIE/USDT","STRK/USDT","RAD/USDT","COW/USDT","BAND/USDT","MINA/USDT","XNO/USDT","DYM/USDT","HIVE/USDT","ID/USDT","FLOW/USDT","BAL/USDT","IOTA/USDT","GNS/USDT","CELO/USDT","ALICE/USDT","MANA/USDT","ACH/USDT","BIO/USDT","LAZIO/USDT","KAVA/USDT","CFX/USDT","AI/USDT","STPT/USDT","SXP/USDT","ERN/USDT","LUNA/USDT","ZK/USDT","CGPT/USDT","W/USDT","ALPINE/USDT","SLF/USDT","YGG/USDT","PERP/USDT","CETUS/USDT","MTL/USDT","PORTO/USDT","FLUX/USDT","GMT/USDT","OSMO/USDT"]
+    "pair_whitelist":
+    [
+    ]
   },
   "pairlists": [
         {
@@ -55,20 +55,6 @@
                 "keep_pairlist_on_failure": true,
                 "read_timeout": 60
         },
-//        {"method": "AgeFilter", "min_days_listed": 7},
-//        {
-//                "method": "VolatilityFilter",
-//                "lookback_days": 3,
-//                "min_volatility": 0.02,
-//                "max_volatility": 0.75,
-//                "refresh_period": 3600
-//        },
-//        {
-//            "method": "RangeStabilityFilter",
-//            "lookback_days": 3,
-//            "min_rate_of_change": 0.05,
-//            "refresh_period": 3600
-//        },
     {
       "method": "ShuffleFilter",
       "seed": 42
@@ -138,7 +124,7 @@
         "username": "freqtrader",
         "password": "freqtrader"
   },
-  "bot_name": "freqtrade",
+  "bot_name": "freqtrader",
   "initial_state": "running",
   "force_entry_enable": false,
   "internals": {
