@@ -5,7 +5,6 @@ This module defines the interface to apply for strategies
 
 import logging
 from abc import ABC, abstractmethod
-from collections import OrderedDict
 from datetime import datetime, timedelta, timezone
 from math import isinf, isnan
 
@@ -141,9 +140,7 @@ class IStrategy(ABC, HyperStrategyMixin):
     market_direction: MarketDirection = MarketDirection.NONE
 
     # Global cache dictionary
-    _cached_grouped_trades_per_pair: dict[
-        str, OrderedDict[tuple[datetime, datetime], DataFrame]
-    ] = {}
+    _cached_grouped_trades_per_pair: dict[str, DataFrame] = {}
 
     def __init__(self, config: Config) -> None:
         self.config = config
@@ -693,6 +690,104 @@ class IStrategy(ABC, HyperStrategyMixin):
         """
         return current_order_rate
 
+    def adjust_exit_price(
+        self,
+        trade: Trade,
+        order: Order | None,
+        pair: str,
+        current_time: datetime,
+        proposed_rate: float,
+        current_order_rate: float,
+        entry_tag: str | None,
+        side: str,
+        **kwargs,
+    ) -> float:
+        """
+        Exit price re-adjustment logic, returning the user desired limit price.
+        This only executes when a order was already placed, still open (unfilled fully or partially)
+        and not timed out on subsequent candles after entry trigger.
+
+        For full documentation please go to https://www.freqtrade.io/en/latest/strategy-callbacks/
+
+        When not implemented by a strategy, returns current_order_rate as default.
+        If current_order_rate is returned then the existing order is maintained.
+        If None is returned then order gets canceled but not replaced by a new one.
+
+        :param pair: Pair that's currently analyzed
+        :param trade: Trade object.
+        :param order: Order object
+        :param current_time: datetime object, containing the current datetime
+        :param proposed_rate: Rate, calculated based on pricing settings in entry_pricing.
+        :param current_order_rate: Rate of the existing order in place.
+        :param entry_tag: Optional entry_tag (buy_tag) if provided with the buy signal.
+        :param side: 'long' or 'short' - indicating the direction of the proposed trade
+        :param **kwargs: Ensure to keep this here so updates to this won't break your strategy.
+        :return float: New entry price value if provided
+
+        """
+        return current_order_rate
+
+    def adjust_order_price(
+        self,
+        trade: Trade,
+        order: Order | None,
+        pair: str,
+        current_time: datetime,
+        proposed_rate: float,
+        current_order_rate: float,
+        entry_tag: str | None,
+        side: str,
+        is_entry: bool,
+        **kwargs,
+    ) -> float:
+        """
+        Exit and entry order price re-adjustment logic, returning the user desired limit price.
+        This only executes when a order was already placed, still open (unfilled fully or partially)
+        and not timed out on subsequent candles after entry trigger.
+
+        For full documentation please go to https://www.freqtrade.io/en/latest/strategy-callbacks/
+
+        When not implemented by a strategy, returns current_order_rate as default.
+        If current_order_rate is returned then the existing order is maintained.
+        If None is returned then order gets canceled but not replaced by a new one.
+
+        :param pair: Pair that's currently analyzed
+        :param trade: Trade object.
+        :param order: Order object
+        :param current_time: datetime object, containing the current datetime
+        :param proposed_rate: Rate, calculated based on pricing settings in entry_pricing.
+        :param current_order_rate: Rate of the existing order in place.
+        :param entry_tag: Optional entry_tag (buy_tag) if provided with the buy signal.
+        :param side: 'long' or 'short' - indicating the direction of the proposed trade
+        :param is_entry: True if the order is an entry order, False if it's an exit order.
+        :param **kwargs: Ensure to keep this here so updates to this won't break your strategy.
+        :return float: New entry price value if provided
+        """
+        if is_entry:
+            return self.adjust_entry_price(
+                trade=trade,
+                order=order,
+                pair=pair,
+                current_time=current_time,
+                proposed_rate=proposed_rate,
+                current_order_rate=current_order_rate,
+                entry_tag=entry_tag,
+                side=side,
+                **kwargs,
+            )
+        else:
+            return self.adjust_exit_price(
+                trade=trade,
+                order=order,
+                pair=pair,
+                current_time=current_time,
+                proposed_rate=proposed_rate,
+                current_order_rate=current_order_rate,
+                entry_tag=entry_tag,
+                side=side,
+                **kwargs,
+            )
+
     def leverage(
         self,
         pair: str,
@@ -1163,10 +1258,14 @@ class IStrategy(ABC, HyperStrategyMixin):
             logger.warning(f"Empty candle (OHLCV) data for pair {pair}")
             return None, None
 
-        latest_date = dataframe["date"].max()
-        latest = dataframe.loc[dataframe["date"] == latest_date].iloc[-1]
+        try:
+            latest_date_pd = dataframe["date"].max()
+            latest = dataframe.loc[dataframe["date"] == latest_date_pd].iloc[-1]
+        except Exception as e:
+            logger.warning(f"Unable to get latest candle (OHLCV) data for pair {pair} - {e}")
+            return None, None
         # Explicitly convert to datetime object to ensure the below comparison does not fail
-        latest_date = latest_date.to_pydatetime()
+        latest_date: datetime = latest_date_pd.to_pydatetime()
 
         # Check if dataframe is out of date
         timeframe_minutes = timeframe_to_minutes(timeframe)
@@ -1604,15 +1703,11 @@ class IStrategy(ABC, HyperStrategyMixin):
         if use_public_trades:
             trades = self.dp.trades(pair=metadata["pair"], copy=False)
 
-            config = self.config
-            config["timeframe"] = self.timeframe
             pair = metadata["pair"]
             # TODO: slice trades to size of dataframe for faster backtesting
-            cached_grouped_trades: OrderedDict[tuple[datetime, datetime], DataFrame] = (
-                self._cached_grouped_trades_per_pair.get(pair, OrderedDict())
-            )
+            cached_grouped_trades: DataFrame | None = self._cached_grouped_trades_per_pair.get(pair)
             dataframe, cached_grouped_trades = populate_dataframe_with_trades(
-                cached_grouped_trades, config, dataframe, trades
+                cached_grouped_trades, self.config, dataframe, trades
             )
 
             # dereference old cache

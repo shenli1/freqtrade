@@ -7,12 +7,12 @@ import asyncio
 import inspect
 import logging
 import signal
-from collections.abc import Coroutine
+from collections.abc import Coroutine, Generator
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from math import floor, isnan
 from threading import Lock
-from typing import Any, Literal, TypeGuard
+from typing import Any, Literal, TypeGuard, TypeVar
 
 import ccxt
 import ccxt.pro as ccxt_pro
@@ -113,6 +113,8 @@ from freqtrade.util.periodic_cache import PeriodicCache
 
 logger = logging.getLogger(__name__)
 
+T = TypeVar("T")
+
 
 class Exchange:
     # Parameters to add directly to buy/sell calls (like agreeing to trading agreement)
@@ -131,7 +133,6 @@ class Exchange:
         "stoploss_order_types": {},
         "order_time_in_force": ["GTC"],
         "ohlcv_params": {},
-        "ohlcv_candle_limit": 500,
         "ohlcv_has_history": True,  # Some exchanges (Kraken) don't provide history via ohlcv
         "ohlcv_partial_candle": True,
         "ohlcv_require_since": False,
@@ -156,6 +157,7 @@ class Exchange:
         # Override createMarketBuyOrderRequiresPrice where ccxt has it wrong
         "marketOrderRequiresPrice": False,
         "exchange_has_overrides": {},  # Dictionary overriding ccxt's "has".
+        "proxy_coin_mapping": {},  # Mapping for proxy coins
         # Expected to be in the format {"fetchOHLCV": True} or {"fetchOHLCV": False}
         "ws_enabled": False,  # Set to true for exchanges with tested websocket support
     }
@@ -201,7 +203,7 @@ class Exchange:
 
         self._cache_lock = Lock()
         # Cache for 10 minutes ...
-        self._fetch_tickers_cache: TTLCache = TTLCache(maxsize=2, ttl=60 * 10)
+        self._fetch_tickers_cache: TTLCache = TTLCache(maxsize=4, ttl=60 * 10)
         # Cache values for 300 to avoid frequent polling of the exchange for prices
         # Caching only applies to RPC methods, so prices for open trades are still
         # refreshed once every iteration.
@@ -275,6 +277,11 @@ class Exchange:
 
         logger.info(f'Using Exchange "{self.name}"')
         self.required_candle_call_count = 1
+        # Converts the interval provided in minutes in config to seconds
+        self.markets_refresh_interval: int = (
+            exchange_conf.get("markets_refresh_interval", 60) * 60 * 1000
+        )
+
         if validate:
             # Initial markets load
             self.reload_markets(True, load_leverage_tiers=False)
@@ -283,11 +290,6 @@ class Exchange:
             self.required_candle_call_count = self.validate_required_startup_candles(
                 self._startup_candle_count, config.get("timeframe", "")
             )
-
-        # Converts the interval provided in minutes in config to seconds
-        self.markets_refresh_interval: int = (
-            exchange_conf.get("markets_refresh_interval", 60) * 60 * 1000
-        )
 
         if self.trading_mode != TradingMode.SPOT and load_leverage_tiers:
             self.fill_leverage_tiers()
@@ -465,7 +467,12 @@ class Exchange:
         :return: Candle limit as integer
         """
 
-        fallback_val = self._ft_has.get("ohlcv_candle_limit")
+        ccxt_val = self.features(
+            "spot" if candle_type == CandleType.SPOT else "futures", "fetchOHLCV", "limit", 500
+        )
+        if not isinstance(ccxt_val, float | int):
+            ccxt_val = 500
+        fallback_val = self._ft_has.get("ohlcv_candle_limit", ccxt_val)
         if candle_type == CandleType.FUNDING_RATE:
             fallback_val = self._ft_has.get("funding_fee_candle_limit", fallback_val)
         return int(
@@ -547,6 +554,7 @@ class Exchange:
             and (
                 self.precisionMode != TICK_SIZE
                 # Too low precision will falsify calculations
+                or market.get("precision", {}).get("price") is None
                 or market.get("precision", {}).get("price") > 1e-11
             )
             and (
@@ -640,7 +648,8 @@ class Exchange:
 
     def _load_async_markets(self, reload: bool = False) -> dict[str, Any]:
         try:
-            markets = self.loop.run_until_complete(self._api_reload_markets(reload=reload))
+            with self._loop_lock:
+                markets = self.loop.run_until_complete(self._api_reload_markets(reload=reload))
 
             if isinstance(markets, Exception):
                 raise markets
@@ -705,14 +714,22 @@ class Exchange:
                 f"Available currencies are: {', '.join(quote_currencies)}"
             )
 
-    def get_valid_pair_combination(self, curr_1: str, curr_2: str) -> str:
+    def get_valid_pair_combination(self, curr_1: str, curr_2: str) -> Generator[str, None, None]:
         """
         Get valid pair combination of curr_1 and curr_2 by trying both combinations.
         """
-        for pair in [f"{curr_1}/{curr_2}", f"{curr_2}/{curr_1}"]:
+        yielded = False
+        for pair in (
+            f"{curr_1}/{curr_2}",
+            f"{curr_2}/{curr_1}",
+            f"{curr_1}/{curr_2}:{curr_2}",
+            f"{curr_2}/{curr_1}:{curr_1}",
+        ):
             if pair in self.markets and self.markets[pair].get("active"):
-                return pair
-        raise ValueError(f"Could not combine {curr_1} and {curr_2} to get a valid pair.")
+                yielded = True
+                yield pair
+        if not yielded:
+            raise ValueError(f"Could not combine {curr_1} and {curr_2} to get a valid pair.")
 
     def validate_timeframes(self, timeframe: str | None) -> None:
         """
@@ -876,6 +893,24 @@ class Exchange:
         if endpoint in self._ft_has.get("exchange_has_overrides", {}):
             return self._ft_has["exchange_has_overrides"][endpoint]
         return endpoint in self._api_async.has and self._api_async.has[endpoint]
+
+    def features(
+        self, market_type: Literal["spot", "futures"], endpoint, attribute, default: T
+    ) -> T:
+        """
+        Returns the exchange features for the given markettype
+        https://docs.ccxt.com/#/README?id=features
+        attributes are in a nested dict, with spot and swap.linear
+        e.g. spot.fetchOHLCV.limit
+             swap.linear.fetchOHLCV.limit
+        """
+        feat = (
+            self._api_async.features.get("spot", {})
+            if market_type == "spot"
+            else self._api_async.features.get("swap", {}).get("linear", {})
+        )
+
+        return feat.get(endpoint, {}).get(attribute, default)
 
     def get_precision_amount(self, pair: str) -> float | None:
         """
@@ -1801,24 +1836,37 @@ class Exchange:
             raise OperationalException(e) from e
 
     @retrier
-    def get_tickers(self, symbols: list[str] | None = None, *, cached: bool = False) -> Tickers:
+    def get_tickers(
+        self,
+        symbols: list[str] | None = None,
+        *,
+        cached: bool = False,
+        market_type: TradingMode | None = None,
+    ) -> Tickers:
         """
         :param symbols: List of symbols to fetch
         :param cached: Allow cached result
+        :param market_type: Market type to fetch - either spot or futures.
         :return: fetch_tickers result
         """
         tickers: Tickers
         if not self.exchange_has("fetchTickers"):
             return {}
+        cache_key = f"fetch_tickers_{market_type}" if market_type else "fetch_tickers"
         if cached:
             with self._cache_lock:
-                tickers = self._fetch_tickers_cache.get("fetch_tickers")  # type: ignore
+                tickers = self._fetch_tickers_cache.get(cache_key)  # type: ignore
             if tickers:
                 return tickers
         try:
-            tickers = self._api.fetch_tickers(symbols)
+            # Re-map futures to swap
+            market_types = {
+                TradingMode.FUTURES: "swap",
+            }
+            params = {"type": market_types.get(market_type, market_type)} if market_type else {}
+            tickers = self._api.fetch_tickers(symbols, params)
             with self._cache_lock:
-                self._fetch_tickers_cache["fetch_tickers"] = tickers
+                self._fetch_tickers_cache[cache_key] = tickers
             return tickers
         except ccxt.NotSupported as e:
             raise OperationalException(
@@ -1842,7 +1890,52 @@ class Exchange:
         except ccxt.BaseError as e:
             raise OperationalException(e) from e
 
-    # Pricing info
+    def get_proxy_coin(self) -> str:
+        """
+        Get the proxy coin for the given coin
+        Falls back to the stake currency if no proxy coin is found
+        :return: Proxy coin or stake currency
+        """
+        return self._config["stake_currency"]
+
+    def get_conversion_rate(self, coin: str, currency: str) -> float | None:
+        """
+        Quick and cached way to get conversion rate one currency to the other.
+        Can then be used as "rate * amount" to convert between currencies.
+        :param coin: Coin to convert
+        :param currency: Currency to convert to
+        :returns: Conversion rate from coin to currency
+        :raises: ExchangeErrors
+        """
+
+        if (proxy_coin := self._ft_has["proxy_coin_mapping"].get(coin, None)) is not None:
+            coin = proxy_coin
+        if (proxy_currency := self._ft_has["proxy_coin_mapping"].get(currency, None)) is not None:
+            currency = proxy_currency
+        if coin == currency:
+            return 1.0
+        tickers = self.get_tickers(cached=True)
+        try:
+            for pair in self.get_valid_pair_combination(coin, currency):
+                ticker: Ticker | None = tickers.get(pair, None)
+                if not ticker:
+                    tickers_other: Tickers = self.get_tickers(
+                        cached=True,
+                        market_type=(
+                            TradingMode.SPOT
+                            if self.trading_mode != TradingMode.SPOT
+                            else TradingMode.FUTURES
+                        ),
+                    )
+                    ticker = tickers_other.get(pair, None)
+                if ticker:
+                    rate: float | None = safe_value_fallback2(ticker, ticker, "last", "ask", None)
+                    if rate and pair.startswith(currency) and not pair.endswith(currency):
+                        rate = 1.0 / rate
+                    return rate
+        except ValueError:
+            return None
+        return None
 
     @retrier
     def fetch_ticker(self, pair: str) -> Ticker:
@@ -2198,10 +2291,11 @@ class Exchange:
                 # If cost is None or 0.0 -> falsy, return None
                 return None
             try:
-                comb = self.get_valid_pair_combination(fee_curr, self._config["stake_currency"])
-                tick = self.fetch_ticker(comb)
-
-                fee_to_quote_rate = safe_value_fallback2(tick, tick, "last", "ask")
+                fee_to_quote_rate = self.get_conversion_rate(
+                    fee_curr, self._config["stake_currency"]
+                )
+                if not fee_to_quote_rate:
+                    raise ValueError("Conversion rate not found.")
             except (ValueError, ExchangeError):
                 fee_to_quote_rate = self._config["exchange"].get("unknown_fee_rate", None)
                 if not fee_to_quote_rate:
@@ -2244,21 +2338,22 @@ class Exchange:
         :param pair: Pair to download
         :param timeframe: Timeframe to get data for
         :param since_ms: Timestamp in milliseconds to get history from
-        :param until_ms: Timestamp in milliseconds to get history up to
         :param candle_type: '', mark, index, premiumIndex, or funding_rate
+        :param is_new_pair: used by binance subclass to allow "fast" new pair downloading
+        :param until_ms: Timestamp in milliseconds to get history up to
         :return: Dataframe with candle (OHLCV) data
         """
-        pair, _, _, data, _ = self.loop.run_until_complete(
-            self._async_get_historic_ohlcv(
-                pair=pair,
-                timeframe=timeframe,
-                since_ms=since_ms,
-                until_ms=until_ms,
-                is_new_pair=is_new_pair,
-                candle_type=candle_type,
+        with self._loop_lock:
+            pair, _, _, data, _ = self.loop.run_until_complete(
+                self._async_get_historic_ohlcv(
+                    pair=pair,
+                    timeframe=timeframe,
+                    since_ms=since_ms,
+                    until_ms=until_ms,
+                    candle_type=candle_type,
+                )
             )
-        )
-        logger.info(f"Downloaded data for {pair} with length {len(data)}.")
+        logger.debug(f"Downloaded data for {pair} from ccxt with length {len(data)}.")
         return ohlcv_to_dataframe(data, timeframe, pair, fill_missing=False, drop_incomplete=True)
 
     async def _async_get_historic_ohlcv(
@@ -2267,13 +2362,11 @@ class Exchange:
         timeframe: str,
         since_ms: int,
         candle_type: CandleType,
-        is_new_pair: bool = False,
         raise_: bool = False,
         until_ms: int | None = None,
     ) -> OHLCVResponse:
         """
         Download historic ohlcv
-        :param is_new_pair: used by binance subclass to allow "fast" new pair downloading
         :param candle_type: Any of the enum CandleType (must match trading mode!)
         """
 
@@ -2325,35 +2418,35 @@ class Exchange:
 
         if cache and (pair, timeframe, candle_type) in self._klines:
             candle_limit = self.ohlcv_candle_limit(timeframe, candle_type)
-            min_date = int(date_minus_candles(timeframe, candle_limit - 5).timestamp())
+            min_ts = dt_ts(date_minus_candles(timeframe, candle_limit - 5))
 
             if self._exchange_ws:
-                candle_date = int(timeframe_to_prev_date(timeframe).timestamp() * 1000)
-                prev_candle_date = int(date_minus_candles(timeframe, 1).timestamp() * 1000)
-                candles = self._exchange_ws.ccxt_object.ohlcvs.get(pair, {}).get(timeframe)
-                half_candle = int(candle_date - (candle_date - prev_candle_date) * 0.5)
+                candle_ts = dt_ts(timeframe_to_prev_date(timeframe))
+                prev_candle_ts = dt_ts(date_minus_candles(timeframe, 1))
+                candles = self._exchange_ws.ohlcvs(pair, timeframe)
+                half_candle = int(candle_ts - (candle_ts - prev_candle_ts) * 0.5)
                 last_refresh_time = int(
                     self._exchange_ws.klines_last_refresh.get((pair, timeframe, candle_type), 0)
                 )
 
                 if (
                     candles
-                    and candles[-1][0] >= prev_candle_date
+                    and candles[-1][0] >= prev_candle_ts
                     and last_refresh_time >= half_candle
                 ):
                     # Usable result, candle contains the previous candle.
                     # Also, we check if the last refresh time is no more than half the candle ago.
                     logger.debug(f"reuse watch result for {pair}, {timeframe}, {last_refresh_time}")
 
-                    return self._exchange_ws.get_ohlcv(pair, timeframe, candle_type, candle_date)
+                    return self._exchange_ws.get_ohlcv(pair, timeframe, candle_type, candle_ts)
                 logger.info(
-                    f"Failed to reuse watch {pair}, {timeframe}, {candle_date < last_refresh_time},"
-                    f" {candle_date}, {last_refresh_time}, "
-                    f"{format_ms_time(candle_date)}, {format_ms_time(last_refresh_time)} "
+                    f"Failed to reuse watch {pair}, {timeframe}, {candle_ts < last_refresh_time},"
+                    f" {candle_ts}, {last_refresh_time}, "
+                    f"{format_ms_time(candle_ts)}, {format_ms_time(last_refresh_time)} "
                 )
 
             # Check if 1 call can get us updated candles without hole in the data.
-            if min_date < self._pairs_last_refresh_time.get((pair, timeframe, candle_type), 0):
+            if min_ts < self._pairs_last_refresh_time.get((pair, timeframe, candle_type), 0):
                 # Cache can be used - do one-off call.
                 not_all_data = False
             else:
@@ -2431,7 +2524,7 @@ class Exchange:
         # keeping last candle time as last refreshed time of the pair
         if ticks and cache:
             idx = -2 if drop_incomplete and len(ticks) > 1 else -1
-            self._pairs_last_refresh_time[(pair, timeframe, c_type)] = ticks[idx][0] // 1000
+            self._pairs_last_refresh_time[(pair, timeframe, c_type)] = ticks[idx][0]
         # keeping parsed dataframe in cache
         ohlcv_df = ohlcv_to_dataframe(
             ticks, timeframe, pair=pair, fill_missing=True, drop_incomplete=drop_incomplete
@@ -2544,10 +2637,10 @@ class Exchange:
 
     def _now_is_time_to_refresh(self, pair: str, timeframe: str, candle_type: CandleType) -> bool:
         # Timeframe in seconds
-        interval_in_sec = timeframe_to_seconds(timeframe)
+        interval_in_sec = timeframe_to_msecs(timeframe)
         plr = self._pairs_last_refresh_time.get((pair, timeframe, candle_type), 0) + interval_in_sec
         # current,active candle open date
-        now = int(timeframe_to_prev_date(timeframe).timestamp())
+        now = dt_ts(timeframe_to_prev_date(timeframe))
         return plr < now
 
     @retrier_async
@@ -2893,7 +2986,7 @@ class Exchange:
             return trades[-1].get("timestamp")
 
     async def _async_get_trade_history_id_startup(
-        self, pair: str, since: int | None
+        self, pair: str, since: int
     ) -> tuple[list[list], str]:
         """
         override for initial trade_history_id call
@@ -2901,7 +2994,7 @@ class Exchange:
         return await self._async_fetch_trades(pair, since=since)
 
     async def _async_get_trade_history_id(
-        self, pair: str, until: int, since: int | None = None, from_id: str | None = None
+        self, pair: str, *, until: int, since: int, from_id: str | None = None
     ) -> tuple[str, list[list]]:
         """
         Asynchronously gets trade history using fetch_trades
@@ -2937,8 +3030,7 @@ class Exchange:
                     trades.extend(t[x])
                     if from_id == from_id_next or t[-1][0] > until:
                         logger.debug(
-                            f"Stopping because from_id did not change. "
-                            f"Reached {t[-1][0]} > {until}"
+                            f"Stopping because from_id did not change. Reached {t[-1][0]} > {until}"
                         )
                         # Reached the end of the defined-download period - add last trade as well.
                         if has_overlap:
@@ -2956,7 +3048,7 @@ class Exchange:
         return (pair, trades)
 
     async def _async_get_trade_history_time(
-        self, pair: str, until: int, since: int | None = None
+        self, pair: str, until: int, since: int
     ) -> tuple[str, list[list]]:
         """
         Asynchronously gets trade history using fetch_trades,
@@ -2997,7 +3089,7 @@ class Exchange:
     async def _async_get_trade_history(
         self,
         pair: str,
-        since: int | None = None,
+        since: int,
         until: int | None = None,
         from_id: str | None = None,
     ) -> tuple[str, list[list]]:
@@ -3028,7 +3120,7 @@ class Exchange:
     def get_historic_trades(
         self,
         pair: str,
-        since: int | None = None,
+        since: int,
         until: int | None = None,
         from_id: str | None = None,
     ) -> tuple[str, list]:
@@ -3612,7 +3704,7 @@ class Exchange:
             Wherein, "+" or "-" depends on whether the contract goes long or short:
             "-" for long, and "+" for short.
 
-         okex: https://www.okx.com/support/hc/en-us/articles/
+         okx: https://www.okx.com/support/hc/en-us/articles/
             360053909592-VI-Introduction-to-the-isolated-mode-of-Single-Multi-currency-Portfolio-margin
 
         :param pair: Pair to calculate liquidation price for

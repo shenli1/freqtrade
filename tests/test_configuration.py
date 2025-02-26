@@ -111,7 +111,7 @@ def test_load_config_file_error_range(default_conf, mocker, caplog) -> None:
 
     x = log_config_error_range("somefile", "Parse error at offset 4: Invalid value.")
     assert isinstance(x, str)
-    assert x == '  "max_open_trades": 1,\n  "stake_currency": "BTC",\n' '  "stake_amount": .001,'
+    assert x == '  "max_open_trades": 1,\n  "stake_currency": "BTC",\n  "stake_amount": .001,'
 
     x = log_config_error_range("-", "")
     assert x == ""
@@ -1481,6 +1481,12 @@ def test_flat_vars_to_nested_dict(caplog):
         "FREQTRADE__STAKE_AMOUNT": "200.05",
         "FREQTRADE__TELEGRAM__CHAT_ID": "2151",
         "NOT_RELEVANT": "200.0",  # Will be ignored
+        "FREQTRADE__ARRAY": '[{"name":"default","host":"xxx"}]',
+        "FREQTRADE__EXCHANGE__PAIR_WHITELIST": '["BTC/USDT", "ETH/USDT"]',
+        # Fails due to trailing comma
+        "FREQTRADE__ARRAY_TRAIL_COMMA": '[{"name":"default","host":"xxx",}]',
+        # Object fails
+        "FREQTRADE__OBJECT": '{"name":"default","host":"xxx"}',
     }
     expected = {
         "stake_amount": 200.05,
@@ -1494,8 +1500,12 @@ def test_flat_vars_to_nested_dict(caplog):
             },
             "some_setting": True,
             "some_false_setting": False,
+            "pair_whitelist": ["BTC/USDT", "ETH/USDT"],
         },
         "telegram": {"chat_id": "2151"},
+        "array": [{"name": "default", "host": "xxx"}],
+        "object": '{"name":"default","host":"xxx"}',
+        "array_trail_comma": '[{"name":"default","host":"xxx",}]',
     }
     res = _flat_vars_to_nested_dict(test_args, ENV_VAR_PREFIX)
     assert res == expected

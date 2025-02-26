@@ -28,6 +28,7 @@ from freqtrade.optimize.hyperopt_loss.hyperopt_loss_interface import IHyperOptLo
 from freqtrade.optimize.hyperopt_tools import HyperoptStateContainer, HyperoptTools
 from freqtrade.optimize.optimize_reports import generate_strategy_stats
 from freqtrade.resolvers.hyperopt_resolver import HyperOptLossResolver
+from freqtrade.util.dry_run_wallet import get_dry_run_wallet
 
 
 # Suppress scikit-learn FutureWarnings from skopt
@@ -113,7 +114,7 @@ class HyperOptimizer:
     def get_strategy_name(self) -> str:
         return self.backtesting.strategy.get_strategy_name()
 
-    def hyperopt_pickle_magic(self, bases) -> None:
+    def hyperopt_pickle_magic(self, bases: tuple[type, ...]) -> None:
         """
         Hyperopt magic to allow strategy inheritance across files.
         For this to properly work, we need to register the module of the imported class
@@ -121,7 +122,8 @@ class HyperOptimizer:
         """
         for modules in bases:
             if modules.__name__ != "IStrategy":
-                cloudpickle.register_pickle_by_value(sys.modules[modules.__module__])
+                if mod := sys.modules.get(modules.__module__):
+                    cloudpickle.register_pickle_by_value(mod)
                 self.hyperopt_pickle_magic(modules.__bases__)
 
     def _get_params_dict(
@@ -363,6 +365,7 @@ class HyperOptimizer:
                 config=self.config,
                 processed=processed,
                 backtest_stats=strat_stats,
+                starting_balance=get_dry_run_wallet(self.config),
             )
         return {
             "loss": loss,

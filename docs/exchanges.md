@@ -118,7 +118,7 @@ When trading on Binance Futures market, orderbook must be used because there is 
   },
 ```
 
-#### Binance futures settings
+#### Binance isolated futures settings
 
 Users will also have to have the futures-setting "Position Mode" set to "One-way Mode", and "Asset Mode" set to "Single-Asset Mode".
 These settings will be checked on startup, and freqtrade will show an error if this setting is wrong.
@@ -126,6 +126,27 @@ These settings will be checked on startup, and freqtrade will show an error if t
 ![Binance futures settings](assets/binance_futures_settings.png)
 
 Freqtrade will not attempt to change these settings.
+
+#### Binance BNFCR futures
+
+BNFCR mode are a special type of futures mode on Binance to work around regulatory issues in Europe.  
+To use BNFCR futures, you will have to have the following combination of settings:
+
+``` jsonc
+{
+    // ...
+    "trading_mode": "futures",
+    "margin_mode": "cross",
+    "proxy_coin": "BNFCR",
+    "stake_currency": "USDT" // or "USDC"
+    // ...
+}
+```
+
+The `stake_currency` setting defines the markets the bot will be operating in. This choice is really arbitrary.
+
+On the exchange, you'll have to use "Multi-asset Mode" - and "Position Mode set to "One-way Mode".  
+Freqtrade will check these settings on startup, but won't attempt to change them.
 
 ## Bingx
 
@@ -189,7 +210,7 @@ freqtrade download-data --exchange kraken --dl-trades -p BTC/EUR BCH/EUR
     It will also take a long time, as freqtrade will need to download every single trade that happened on the exchange for the pair / timerange combination, therefore please be patient.
 
 !!! Warning "rateLimit tuning"
-    Please pay attention that rateLimit configuration entry holds delay in milliseconds between requests, NOT requests\sec rate.
+    Please pay attention that rateLimit configuration entry holds delay in milliseconds between requests, NOT requests/sec rate.
     So, in order to mitigate Kraken API "Rate limit exceeded" exception, this configuration should be increased, NOT decreased.
 
 ## Kucoin
@@ -217,12 +238,12 @@ Kucoin supports [time_in_force](configuration.md#understand-order_time_in_force)
 For Kucoin, it is suggested to add `"KCS/<STAKE>"` to your blacklist to avoid issues, unless you are willing to maintain enough extra `KCS` on the account or unless you're willing to disable using `KCS` for fees. 
 Kucoin accounts may use `KCS` for fees, and if a trade happens to be on `KCS`, further trades may consume this position and make the initial `KCS` trade unsellable as the expected amount is not there anymore.
 
-## HTX (formerly Huobi)
+## HTX
 
 !!! Tip "Stoploss on Exchange"
     HTX supports `stoploss_on_exchange` and uses `stop-limit` orders. It provides great advantages, so we recommend to benefit from it by enabling stoploss on exchange.
 
-## OKX (former OKEX)
+## OKX
 
 OKX requires a passphrase for each api key, you will therefore need to add this key into the configuration so your exchange section looks as follows:
 
@@ -235,6 +256,9 @@ OKX requires a passphrase for each api key, you will therefore need to add this 
     // ...
 }
 ```
+
+If you've registered with OKX on the host my.okx.com (OKX EAA)- you will need to use `"myokx"` as the exchange name.
+Using the wrong exchange will result in the error "OKX Error 50119: API key doesn't exist" - as the 2 are separate entities.
 
 !!! Warning
     OKX only provides 100 candles per api call. Therefore, the strategy will only have a pretty low amount of data available in backtesting mode.
@@ -269,6 +293,7 @@ On startup, freqtrade will set the position mode to "One-way Mode" for the whole
 As bybit doesn't provide funding rate history, the dry-run calculation is used for live trades as well.
 
 API Keys for live futures trading must have the following permissions:
+
 * Read-write
 * Contract - Orders
 * Contract - Positions
@@ -308,20 +333,20 @@ It's therefore required to pass the UID as well.
 !!! Tip "Stoploss on Exchange"
     Hyperliquid supports `stoploss_on_exchange` and uses `stop-loss-limit` orders. It provides great advantages, so we recommend to benefit from it.
 
-Hyperliquid is a Decentralized Exchange (DEX). Decentralized exchanges work a bit different compared to normal exchanges. Instead of authenticating private API calls using an API key, private API calls need to be signed with the private key of your wallet.
+Hyperliquid is a Decentralized Exchange (DEX). Decentralized exchanges work a bit different compared to normal exchanges. Instead of authenticating private API calls using an API key, private API calls need to be signed with the private key of your wallet (We recommend using an api Wallet for this, generated either on Hyperliquid or in your wallet of choice).
 This needs to be configured like this:
 
 ```json
 "exchange": {
     "name": "hyperliquid",
     "walletAddress": "your_eth_wallet_address",
-    "privateKey": "your_private_key",
+    "privateKey": "your_api_private_key",
     // ...
 }
 ```
 
-* walletAddress must be in hex format: `0x<40 hex characters>`, and can be easily copied from your wallet.
-* privateKey also must be in hex format: `0x<64 hex characters>`, and can either be exported from your wallet or regenerated using your mnemonic phrase.
+* walletAddress in hex format: `0x<40 hex characters>` - Can be easily copied from your wallet - and should be your wallet address, not your API Wallet Address.
+* privateKey in hex format: `0x<64 hex characters>` - Use the key the API Wallet shows on creation.
 
 Hyperliquid handles deposits and withdrawals on the Arbitrum One chain, a Layer 2 scaling solution built on top of Ethereum. Hyperliquid uses USDC as quote / collateral. The process of depositing USDC on Hyperliquid requires a couple of steps, see [how to start trading](https://hyperliquid.gitbook.io/hyperliquid-docs/onboarding/how-to-start-trading) for details on what steps are needed.
 
@@ -330,14 +355,13 @@ Hyperliquid handles deposits and withdrawals on the Arbitrum One chain, a Layer 
     Unfortunately, hyperliquid only offers 5000 historic candles, so backtesting will either need to build candles historically (by waiting and downloading the data incrementally over time) - or will be limited to the last 5000 candles.
 
 !!! Info "Some general best practices (non exhaustive)"
-    * Beware of supply chain attacks, like pip package poisoning etcetera. However you export or (re-)generate your private key, make sure your environment is safe.
-    * Interact as little with the private key as possible. Store it in a separate file from the config.json (secrets.json for example) that you never have to touch, and secure it.
+    * Beware of supply chain attacks, like pip package poisoning etcetera. Whenever you use your private key, make sure your environment is safe.
+    * Don't use your actual wallet private key for trading. Use the Hyperliquid [API generator](https://app.hyperliquid.xyz/API) to create a separate API wallet.
+    * Don't store your actual wallet private key on the server you use for freqtrade. Use the API wallet private key instead. This key won't allow withdrawals, only trading.
     * Always keep your mnemonic phrase and private key private.
     * Don't use the same mnemonic as the one you had to backup when initializing a hardware wallet, using the same mnemonic basically deletes the security of your hardware wallet.
-    * Create a different software wallet, only transfer the funds you want to trade with to that wallet, and use that wallet / private key to trade on Hyperliquid.
-    * Remember that if someone hacks the host you use for trading, or any other host you stored your private key / mnemonic on, you will lose the funds protected by that private key. That means the funds on that wallet and the funds deposited on Hyperliquid.
+    * Create a different software wallet, only transfer the funds you want to trade with to that wallet, and use that wallet to trade on Hyperliquid.
     * If you have funds you don't want to use for trading (after making a profit for example), transfer them back to your hardware wallet.
-
 
 ## All exchanges
 
@@ -348,7 +372,7 @@ Should you experience constant errors with Nonce (like `InvalidNonce`), it is be
 * The Ocean (exchange id: `theocean`) exchange uses Web3 functionality and requires `web3` python package to be installed:
 
 ```shell
-$ pip3 install web3
+pip3 install web3
 ```
 
 ### Getting latest price / Incomplete candles

@@ -18,7 +18,7 @@ from freqtrade.data.metrics import (
     calculate_sortino,
 )
 from freqtrade.ft_types import BacktestResultType
-from freqtrade.util import decimals_per_coin, fmt_coin
+from freqtrade.util import decimals_per_coin, fmt_coin, get_dry_run_wallet
 
 
 logger = logging.getLogger(__name__)
@@ -69,7 +69,7 @@ def generate_rejected_signals(
 
 
 def _generate_result_line(
-    result: DataFrame, starting_balance: int, first_column: str | list[str]
+    result: DataFrame, starting_balance: float, first_column: str | list[str]
 ) -> dict:
     """
     Generate one result dict, with "first_column" as key.
@@ -108,10 +108,17 @@ def _generate_result_line(
     }
 
 
-def generate_pair_metrics(
+def calculate_trade_volume(trades_dict: list[dict[str, Any]]) -> float:
+    # Aggregate the total volume traded from orders.cost.
+    # Orders is a nested dictionary within the trades list.
+
+    return sum(sum(order["cost"] for order in trade.get("orders", [])) for trade in trades_dict)
+
+
+def generate_pair_metrics(  #
     pairlist: list[str],
     stake_currency: str,
-    starting_balance: int,
+    starting_balance: float,
     results: DataFrame,
     skip_nan: bool = False,
 ) -> list[dict]:
@@ -144,7 +151,7 @@ def generate_pair_metrics(
 
 def generate_tag_metrics(
     tag_type: Literal["enter_tag", "exit_reason"] | list[Literal["enter_tag", "exit_reason"]],
-    starting_balance: int,
+    starting_balance: float,
     results: DataFrame,
     skip_nan: bool = False,
 ) -> list[dict]:
@@ -368,12 +375,12 @@ def generate_strategy_stats(
     :param market_change: float indicating the market change
     :return: Dictionary containing results per strategy and a strategy summary.
     """
-    results: dict[str, DataFrame] = content["results"]
+    results: DataFrame = content["results"]
     if not isinstance(results, DataFrame):
         return {}
     config = content["config"]
     max_open_trades = min(config["max_open_trades"], len(pairlist))
-    start_balance = config["dry_run_wallet"]
+    start_balance = get_dry_run_wallet(config)
     stake_currency = config["stake_currency"]
 
     pair_results = generate_pair_metrics(
@@ -431,8 +438,9 @@ def generate_strategy_stats(
 
     expectancy, expectancy_ratio = calculate_expectancy(results)
     backtest_days = (max_date - min_date).days or 1
+    trades_dict = results.to_dict(orient="records")
     strat_stats = {
-        "trades": results.to_dict(orient="records"),
+        "trades": trades_dict,
         "locks": [lock.to_json() for lock in content["locks"]],
         "best_pair": best_pair,
         "worst_pair": worst_pair,
@@ -444,7 +452,7 @@ def generate_strategy_stats(
         "total_trades": len(results),
         "trade_count_long": len(results.loc[~results["is_short"]]),
         "trade_count_short": len(results.loc[results["is_short"]]),
-        "total_volume": float(results["stake_amount"].sum()),
+        "total_volume": calculate_trade_volume(trades_dict),
         "avg_stake_amount": results["stake_amount"].mean() if len(results) > 0 else 0,
         "profit_mean": results["profit_ratio"].mean() if len(results) > 0 else 0,
         "profit_median": results["profit_ratio"].median() if len(results) > 0 else 0,

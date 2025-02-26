@@ -4,7 +4,7 @@ Exchange support utils
 
 import inspect
 from datetime import datetime, timedelta, timezone
-from math import ceil, floor
+from math import ceil, floor, isnan
 from typing import Any
 
 import ccxt
@@ -23,6 +23,7 @@ from freqtrade.exchange.common import (
     BAD_EXCHANGES,
     EXCHANGE_HAS_OPTIONAL,
     EXCHANGE_HAS_REQUIRED,
+    MAP_EXCHANGE_CHILDCLASS,
     SUPPORTED_EXCHANGES,
 )
 from freqtrade.exchange.exchange_utils_timeframe import timeframe_to_minutes, timeframe_to_prev_date
@@ -91,21 +92,24 @@ def validate_exchange(exchange: str) -> tuple[bool, str, ccxt.Exchange | None]:
 def _build_exchange_list_entry(
     exchange_name: str, exchangeClasses: dict[str, Any]
 ) -> ValidExchangesType:
+    exchange_name = exchange_name.lower()
     valid, comment, ex_mod = validate_exchange(exchange_name)
+    mapped_exchange_name = MAP_EXCHANGE_CHILDCLASS.get(exchange_name, exchange_name).lower()
+    is_alias = getattr(ex_mod, "alias", False)
     result: ValidExchangesType = {
         "name": getattr(ex_mod, "name", exchange_name),
         "classname": exchange_name,
         "valid": valid,
-        "supported": exchange_name.lower() in SUPPORTED_EXCHANGES,
+        "supported": mapped_exchange_name in SUPPORTED_EXCHANGES and not is_alias,
         "comment": comment,
         "dex": getattr(ex_mod, "dex", False),
-        "is_alias": getattr(ex_mod, "alias", False),
+        "is_alias": is_alias,
         "alias_for": inspect.getmro(ex_mod.__class__)[1]().id
         if getattr(ex_mod, "alias", False)
         else None,
         "trade_modes": [{"trading_mode": "spot", "margin_mode": ""}],
     }
-    if resolved := exchangeClasses.get(exchange_name.lower()):
+    if resolved := exchangeClasses.get(mapped_exchange_name):
         supported_modes = [{"trading_mode": "spot", "margin_mode": ""}] + [
             {"trading_mode": tm.value, "margin_mode": mm.value}
             for tm, mm in resolved["class"]._supported_trading_mode_margin_pairs
@@ -301,14 +305,16 @@ def price_to_precision(
     :param rounding_mode: rounding mode to use. Defaults to ROUND
     :return: price rounded up to the precision the Exchange accepts
     """
-    if price_precision is not None and precisionMode is not None:
+    if price_precision is not None and precisionMode is not None and not isnan(price):
         if rounding_mode not in (ROUND_UP, ROUND_DOWN):
             # Use CCXT code where possible.
             return float(
                 decimal_to_precision(
                     price,
                     rounding_mode=rounding_mode,
-                    precision=price_precision,
+                    precision=int(price_precision)
+                    if precisionMode != TICK_SIZE
+                    else price_precision,
                     counting_mode=precisionMode,
                 )
             )

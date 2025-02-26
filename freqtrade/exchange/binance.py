@@ -5,13 +5,18 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import ccxt
+from pandas import DataFrame
 
+from freqtrade.constants import DEFAULT_DATAFRAME_COLUMNS
 from freqtrade.enums import CandleType, MarginMode, PriceType, TradingMode
 from freqtrade.exceptions import DDosProtection, OperationalException, TemporaryError
 from freqtrade.exchange import Exchange
+from freqtrade.exchange.binance_public_data import concat_safe, download_archive_ohlcv
 from freqtrade.exchange.common import retrier
-from freqtrade.exchange.exchange_types import FtHas, OHLCVResponse, Tickers
+from freqtrade.exchange.exchange_types import FtHas, Tickers
+from freqtrade.exchange.exchange_utils_timeframe import timeframe_to_msecs
 from freqtrade.misc import deep_merge_dicts, json_load
+from freqtrade.util.datetime_helpers import dt_from_ts, dt_ts
 
 
 logger = logging.getLogger(__name__)
@@ -24,7 +29,6 @@ class Binance(Exchange):
         "stop_price_prop": "stopPrice",
         "stoploss_order_types": {"limit": "stop_loss_limit"},
         "order_time_in_force": ["GTC", "FOK", "IOC", "PO"],
-        "ohlcv_candle_limit": 1000,
         "trades_pagination": "id",
         "trades_pagination_arg": "fromId",
         "trades_has_history": True,
@@ -32,6 +36,7 @@ class Binance(Exchange):
         "ws_enabled": True,
     }
     _ft_has_futures: FtHas = {
+        "funding_fee_candle_limit": 1000,
         "stoploss_order_types": {"limit": "stop", "market": "stop_market"},
         "order_time_in_force": ["GTC", "FOK", "IOC"],
         "tickers_have_price": False,
@@ -43,17 +48,37 @@ class Binance(Exchange):
             PriceType.MARK: "MARK_PRICE",
         },
         "ws_enabled": False,
+        "proxy_coin_mapping": {
+            "BNFCR": "USDC",
+            "BFUSD": "USDT",
+        },
     }
 
     _supported_trading_mode_margin_pairs: list[tuple[TradingMode, MarginMode]] = [
         # TradingMode.SPOT always supported and not required in this list
         # (TradingMode.MARGIN, MarginMode.CROSS),
-        # (TradingMode.FUTURES, MarginMode.CROSS),
-        (TradingMode.FUTURES, MarginMode.ISOLATED)
+        (TradingMode.FUTURES, MarginMode.CROSS),
+        (TradingMode.FUTURES, MarginMode.ISOLATED),
     ]
 
-    def get_tickers(self, symbols: list[str] | None = None, *, cached: bool = False) -> Tickers:
-        tickers = super().get_tickers(symbols=symbols, cached=cached)
+    def get_proxy_coin(self) -> str:
+        """
+        Get the proxy coin for the given coin
+        Falls back to the stake currency if no proxy coin is found
+        :return: Proxy coin or stake currency
+        """
+        if self.margin_mode == MarginMode.CROSS:
+            return self._config.get("proxy_coin", self._config["stake_currency"])
+        return self._config["stake_currency"]
+
+    def get_tickers(
+        self,
+        symbols: list[str] | None = None,
+        *,
+        cached: bool = False,
+        market_type: TradingMode | None = None,
+    ) -> Tickers:
+        tickers = super().get_tickers(symbols=symbols, cached=cached, market_type=market_type)
         if self.trading_mode == TradingMode.FUTURES:
             # Binance's future result has no bid/ask values.
             # Therefore we must fetch that from fetch_bids_asks and combine the two results.
@@ -80,7 +105,10 @@ class Binance(Exchange):
                         "\nHedge Mode is not supported by freqtrade. "
                         "Please change 'Position Mode' on your binance futures account."
                     )
-                if assets_margin.get("multiAssetsMargin") is True:
+                if (
+                    assets_margin.get("multiAssetsMargin") is True
+                    and self.margin_mode != MarginMode.CROSS
+                ):
                     msg += (
                         "\nMulti-Asset Mode is not supported by freqtrade. "
                         "Please change 'Asset Mode' on your binance futures account."
@@ -97,23 +125,25 @@ class Binance(Exchange):
         except ccxt.BaseError as e:
             raise OperationalException(e) from e
 
-    async def _async_get_historic_ohlcv(
+    def get_historic_ohlcv(
         self,
         pair: str,
         timeframe: str,
         since_ms: int,
         candle_type: CandleType,
         is_new_pair: bool = False,
-        raise_: bool = False,
         until_ms: int | None = None,
-    ) -> OHLCVResponse:
+    ) -> DataFrame:
         """
         Overwrite to introduce "fast new pair" functionality by detecting the pair's listing date
         Does not work for other exchanges, which don't return the earliest data when called with "0"
         :param candle_type: Any of the enum CandleType (must match trading mode!)
         """
         if is_new_pair:
-            x = await self._async_get_candle_history(pair, timeframe, candle_type, 0)
+            with self._loop_lock:
+                x = self.loop.run_until_complete(
+                    self._async_get_candle_history(pair, timeframe, candle_type, 0)
+                )
             if x and x[3] and x[3][0] and x[3][0][0] > since_ms:
                 # Set starting date to first available candle.
                 since_ms = x[3][0][0]
@@ -121,16 +151,89 @@ class Binance(Exchange):
                     f"Candle-data for {pair} available starting with "
                     f"{datetime.fromtimestamp(since_ms // 1000, tz=timezone.utc).isoformat()}."
                 )
+                if until_ms and since_ms >= until_ms:
+                    logger.warning(
+                        f"No available candle-data for {pair} before "
+                        f"{dt_from_ts(until_ms).isoformat()}"
+                    )
+                    return DataFrame(columns=DEFAULT_DATAFRAME_COLUMNS)
 
-        return await super()._async_get_historic_ohlcv(
-            pair=pair,
-            timeframe=timeframe,
-            since_ms=since_ms,
-            is_new_pair=is_new_pair,
-            raise_=raise_,
-            candle_type=candle_type,
-            until_ms=until_ms,
-        )
+        if (
+            self._config["exchange"].get("only_from_ccxt", False)
+            or
+            # only download timeframes with significant improvements,
+            # otherwise fall back to rest API
+            not (
+                (candle_type == CandleType.SPOT and timeframe in ["1s", "1m", "3m", "5m"])
+                or (
+                    candle_type == CandleType.FUTURES
+                    and timeframe in ["1m", "3m", "5m", "15m", "30m"]
+                )
+            )
+        ):
+            return super().get_historic_ohlcv(
+                pair=pair,
+                timeframe=timeframe,
+                since_ms=since_ms,
+                candle_type=candle_type,
+                is_new_pair=is_new_pair,
+                until_ms=until_ms,
+            )
+        else:
+            # Download from data.binance.vision
+            return self.get_historic_ohlcv_fast(
+                pair=pair,
+                timeframe=timeframe,
+                since_ms=since_ms,
+                candle_type=candle_type,
+                is_new_pair=is_new_pair,
+                until_ms=until_ms,
+            )
+
+    def get_historic_ohlcv_fast(
+        self,
+        pair: str,
+        timeframe: str,
+        since_ms: int,
+        candle_type: CandleType,
+        is_new_pair: bool = False,
+        until_ms: int | None = None,
+    ) -> DataFrame:
+        """
+        Fastly fetch OHLCV data by leveraging https://data.binance.vision.
+        """
+        with self._loop_lock:
+            df = self.loop.run_until_complete(
+                download_archive_ohlcv(
+                    candle_type=candle_type,
+                    pair=pair,
+                    timeframe=timeframe,
+                    since_ms=since_ms,
+                    until_ms=until_ms,
+                    markets=self.markets,
+                )
+            )
+
+        # download the remaining data from rest API
+        if df.empty:
+            rest_since_ms = since_ms
+        else:
+            rest_since_ms = dt_ts(df.iloc[-1].date) + timeframe_to_msecs(timeframe)
+
+        # make sure since <= until
+        if until_ms and rest_since_ms > until_ms:
+            rest_df = DataFrame()
+        else:
+            rest_df = super().get_historic_ohlcv(
+                pair=pair,
+                timeframe=timeframe,
+                since_ms=rest_since_ms,
+                candle_type=candle_type,
+                is_new_pair=is_new_pair,
+                until_ms=until_ms,
+            )
+        all_df = concat_safe([df, rest_df])
+        return all_df
 
     def funding_fee_cutoff(self, open_date: datetime):
         """
@@ -262,7 +365,7 @@ class Binance(Exchange):
             return {}
 
     async def _async_get_trade_history_id_startup(
-        self, pair: str, since: int | None
+        self, pair: str, since: int
     ) -> tuple[list[list], str]:
         """
         override for initial call

@@ -28,6 +28,7 @@ from freqtrade.plugins.pairlist.pairlist_helpers import expand_pairlist
 from freqtrade.resolvers import ExchangeResolver, StrategyResolver
 from freqtrade.strategy import IStrategy
 from freqtrade.strategy.strategy_wrapper import strategy_safe_wrapper
+from freqtrade.util import get_dry_run_wallet
 
 
 logger = logging.getLogger(__name__)
@@ -144,7 +145,7 @@ def add_indicators(fig, row, indicators: dict[str, dict], data: pd.DataFrame) ->
             fig.add_trace(trace, row, 1)
         else:
             logger.info(
-                'Indicator "%s" ignored. Reason: This indicator is not found ' "in your strategy.",
+                'Indicator "%s" ignored. Reason: This indicator is not found in your strategy.',
                 indicator,
             )
 
@@ -393,13 +394,12 @@ def add_areas(fig, row: int, data: pd.DataFrame, indicators) -> make_subplots:
                 )
             elif indicator not in data:
                 logger.info(
-                    'Indicator "%s" ignored. Reason: This indicator is not '
-                    "found in your strategy.",
+                    'Indicator "%s" ignored. Reason: This indicator is not found in your strategy.',
                     indicator,
                 )
             elif indicator_b not in data:
                 logger.info(
-                    'fill_to: "%s" ignored. Reason: This indicator is not ' "in your strategy.",
+                    'fill_to: "%s" ignored. Reason: This indicator is not in your strategy.',
                     indicator_b,
                 )
     return fig
@@ -706,7 +706,7 @@ def plot_profit(config: Config) -> None:
         trades,
         config["timeframe"],
         config.get("stake_currency", ""),
-        config.get("available_capital", config["dry_run_wallet"]),
+        config.get("available_capital", get_dry_run_wallet(config)),
     )
     store_plot_file(
         fig,
