@@ -17,10 +17,10 @@
       "max_open_trades": 1
     },
     "buy": {
-      "buy_cti_32": -0.69,
+      "buy_cti_32": -0.80,
       "buy_sma15_32": 0.973,
-      "buy_rsi_32": 40,
-      "buy_rsi_fast_32": 23
+      "buy_rsi_32": 30,
+      "buy_rsi_fast_32": 20
     },
     "sell": {
       "sell_fastx": 84,
@@ -30,5 +30,5 @@
     "protection": {}
   },
   "ft_stratparam_v": 1,
-  "export_time": "2025-02-24 16:15:27.558678+00:00"
+  "export_time": "2025-02-26 14:39:21.016905+00:00"
 }

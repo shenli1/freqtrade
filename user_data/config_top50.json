@@ -36,25 +36,25 @@
     "key": "",
     "secret": "",
     "ccxt_config": {
-      "httpsProxy": "http://127.0.0.1:8001",
-      "wsProxy": "http://127.0.0.1:8001",
       "enableRateLimit": true
     },
     "ccxt_async_config": {
       "enableRateLimit": true,
-      "rateLimit": 200
+      "rateLimit": 250
     },
     "pair_whitelist":
-            ["BTC/USDT","ETH/USDT","XRP/USDT","BNB/USDT","SOL/USDT","ADA/USDT","DOGE/USDT","TRX/USDT","LINK/USDT","TON/USDT","XLM/USDT","HBAR/USDT","AVAX/USDT","SHIB/USDT","SUI/USDT","LTC/USDT","BCH/USDT","DOT/USDT","OM/USDT","UNI/USDT","APT/USDT","NEAR/USDT","PEPE/USDT","ICP/USDT","ETC/USDT","AAVE/USDT","TRUMP/USDT","TAO/USDT","VET/USDT","TIA/USDT","POL/USDT","FIL/USDT","ATOM/USDT","ALGO/USDT","RENDER/USDT"]
+    [
+    ]
   },
   "pairlists": [
-    {
-      "method": "StaticPairList"
-    },
-    {
-      "method": "ShuffleFilter",
-      "seed": 42
-    }
+        {
+                "method": "RemotePairList",
+                "number_assets": 50,
+                "pairlist_url" : "https://remotepairlist.com?q=eac84c1f6679b464",
+                "refresh_period": 900,
+                "keep_pairlist_on_failure": true,
+                "read_timeout": 60
+        }
   ],
   "edge": {
     "enabled": false,
@@ -120,7 +120,7 @@
         "username": "freqtrader",
         "password": "freqtrader"
   },
-  "bot_name": "freqtrade",
+  "bot_name": "freqtrader",
   "initial_state": "running",
   "force_entry_enable": false,
   "internals": {
